@@ -9,7 +9,7 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
     
 class Molecule:
-    def __init__(self, symbols, coordinates, momenta=None, scf_energy=None, forces=None, amplitudes=None, timestep=0, multiplicity=5, dissociation_flags=None):
+    def __init__(self, symbols, coordinates, momenta=None, scf_energy=None, forces=None, amplitudes=None, timestep=0, multiplicity=5, dissociation_flags=None,mo_coefficients=None):
         self.symbols = symbols
         self.coordinates = np.array(coordinates, dtype=np.float128)
         self.momenta = np.array(momenta, dtype=np.float128) if momenta is not None else None
@@ -19,6 +19,7 @@ class Molecule:
         self.timestep = timestep
         self.multiplicity = multiplicity
         self.dissociation_flags = dissociation_flags or ["NO"] * len(symbols)
+        self.mo_coefficients = mo_coefficients if mo_coefficients is not None else None
 
     def update_symbols(self, new_symbols):
         self.symbols = new_symbols
@@ -46,6 +47,9 @@ class Molecule:
     
     def update_dissociation_flags(self, new_flags):
         self.dissociation_flags = new_flags
+
+    def update_mo_coefficients(self, new_mo_coefficients):
+        self.mo_coefficients = new_mo_coefficients
 
     def print_info(self):
         print("Symbols:", self.symbols)

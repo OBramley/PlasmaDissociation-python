@@ -41,31 +41,33 @@ if __name__ == "__main__":
     else: 
          restart='NO'
   
-if(restart == 'NO'):    
+if(restart == 'NO'):
+    Guess=False    
     molecule1 = init.create_molecule(reps, n,nstates,spin_flip)
     molecule2 = init.create_molecule(None, n,nstates,spin_flip)
-    qc.run_qchem(ncpu, molecule1,n, nstates,spin_flip,Guess=False)
+    qc.run_qchem(ncpu, molecule1,n, nstates,spin_flip,Guess)
     out.output_molecule(molecule1)
     startstep = 1
     Guess = True
 elif(restart == 'YES'):
+    Guess=False
     molecule2 = init.create_molecule(None,n,nstates,spin_flip)
     filename = 'output/molecule.json'
     if os.path.exists(filename):
         molecule1 = Molecule.from_json(filename)
         startstep = molecule1.timestep / increment
-        Guess = False
-        qc.run_qchem(ncpu, molecule1,n,nstates,spin_flip, Guess=Guess)
+        qc.run_qchem(ncpu, molecule1,n,nstates,spin_flip, Guess)
+        Guess = True
     else:
         molecule1 = init.create_molecule(reps, n,nstates,spin_flip)
         molecule2 = init.create_molecule(None, n,nstates,spin_flip)
-        qc.run_qchem(ncpu, molecule1,n,nstates,spin_flip, Guess=False)
+        qc.run_qchem(ncpu, molecule1,n,nstates,spin_flip, Guess)
         out.output_molecule(molecule1)
         startstep = 1
         Guess = True
 for i in range(int(startstep), endstep+1):
     molecule2 = prop.prop_1(molecule1, molecule2, n, nstates, increment)
-    qc.run_qchem(ncpu, molecule2,n,nstates,spin_flip, Guess=Guess)
+    qc.run_qchem(ncpu, molecule2,n,nstates,spin_flip, Guess)
     molecule1 = prop.prop_2(molecule1, molecule2, n, nstates, increment)
     molecule1, dissociated = prop.fragements(molecule1,spin_flip)
     molecule1 = prop.prop_diss(molecule1,increment)

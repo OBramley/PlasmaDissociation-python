@@ -5,7 +5,10 @@ import numpy as np
 import re
 import math
 from pyqchem import QchemInput, Structure
+from pyqchem.parsers.parser_frequencies import basic_frequencies
+from pyqchem.parsers.parser_optimization import basic_optimization
 from pyqchem import get_output_from_qchem
+import time
 np.set_printoptions(precision =30)
 
 def file_contains_string(file_path, search_string):
@@ -15,65 +18,104 @@ def file_contains_string(file_path, search_string):
                 return True
     return False
 
-def create_qchem_input(molecule, spin_flip, scf_algorithm="DIIS", Guess=True):
+def create_qchem_input(molecule, spin_flip, Guess, scf_algorithm="DIIS"):
     
     # Filter indices based on dissociation flag
     active_indices = [i for i, flag in enumerate(molecule.dissociation_flags) if flag == 'NO']
     active_coords = [molecule.coordinates[i] for i in active_indices]
     active_symbols = [molecule.symbols[i] for i in active_indices]
-    molecule = Structure(coordinates=active_coords, symbols=active_symbols, multiplicity=molecule.multiplicity)
+    mol = Structure(coordinates=active_coords, symbols=active_symbols, multiplicity=molecule.multiplicity)
    
     if spin_flip==0:
-        qc_inp=QchemInput(molecule,
-                        jobtype='force',
-                        exchange='BHHLYP',
-                        basis='6-31+G*',
-                        unrestricted=True,
-                        max_scf_cycles=500,
-                        sym_ignore=True,
-                        scf_algorithm=scf_algorithm,
-                        extra_rem_keywords={'input_bohr':'true'},
-                        )       
-    elif spin_flip==1:                
-        qc_inp=QchemInput(molecule,
-                        jobtype='force',
-                        exchange='BHHLYP',
-                        basis='6-31+G*',
-                        unrestricted=True,
-                        max_scf_cycles=500,
-                        sym_ignore=True,
-                        scf_algorithm=scf_algorithm,
-                        extra_rem_keywords={'input_bohr':'true','spin_flip':'true','set_iter':500},
-                        # set_iter=500,
-                        cis_n_roots=1,
-                        cis_state_deriv=1
-                        )
-    if Guess:
-       qc_inp.update_input({'scf_guess':'Read'})  
- 
+        if Guess==True:
+            qc_inp=QchemInput(mol,
+                    jobtype='force',
+                    exchange='BHHLYP',
+                    basis='6-31+G*',
+                    unrestricted=True,
+                    max_scf_cycles=500,
+                    sym_ignore=True,
+                    scf_algorithm=scf_algorithm,
+                    extra_rem_keywords={'input_bohr':'true'},
+                    # scf_guess='read'
+                    scf_guess=molecule.mo_coefficients
+                    )       
+        
+        else:
+            qc_inp=QchemInput(mol,
+                            jobtype='force',
+                            exchange='BHHLYP',
+                            basis='6-31+G*',
+                            unrestricted=True,
+                            max_scf_cycles=500,
+                            sym_ignore=True,
+                            scf_algorithm=scf_algorithm,
+                            extra_rem_keywords={'input_bohr':'true'},
+                            )       
+    elif spin_flip==1:
+        if Guess==True:
+            qc_inp=QchemInput(mol,
+                            jobtype='force',
+                            exchange='BHHLYP',
+                            basis='6-31+G*',
+                            unrestricted=True,
+                            max_scf_cycles=500,
+                            sym_ignore=True,
+                            scf_algorithm=scf_algorithm,
+                            extra_rem_keywords={'input_bohr':'true','spin_flip':'true','set_iter':500},
+                            cis_n_roots=1,
+                            cis_state_deriv=1,
+                            scf_guess=molecule.mo_coefficients
+                            )
+        else:               
+            qc_inp=QchemInput(mol,
+                            jobtype='force',
+                            exchange='BHHLYP',
+                            basis='6-31+G*',
+                            unrestricted=True,
+                            max_scf_cycles=500,
+                            sym_ignore=True,
+                            scf_algorithm=scf_algorithm,
+                            extra_rem_keywords={'input_bohr':'true','spin_flip':'true','set_iter':500},
+                            cis_n_roots=1,
+                            cis_state_deriv=1
+                            )
     return qc_inp
                       
-def run_qchem(ncpu, molecule, n, nstates, spin_flip, Guess=True): 
-    qc_inp=create_qchem_input(molecule, spin_flip, scf_algorithm="DIIS", Guess=Guess)
+def run_qchem(ncpu, molecule, n, nstates, spin_flip, Guess):
+    qc_inp=create_qchem_input(molecule, spin_flip, Guess, scf_algorithm="DIIS")
+    start_time = time.process_time()
+
+    
     try:
-        output = get_output_from_qchem(qc_inp,processors=ncpu)
+        output, electronic_structure = get_output_from_qchem(qc_inp,processors=ncpu,return_electronic_structure=True)
     except:
         print('Using DIIS_GDM algorithm')
         # Retry with a different setup
-        qc_inp.update_input({'scf_algorithm': 'DIIS_GDM', 'scf_guess': 'sad'})
+        qc_inp.update_input({'scf_algorithm': 'DIIS_GDM'})#, 'scf_guess': 'sad'})
         try:
-            output = get_output_from_qchem(qc_inp,processors=ncpu)
+            output, electronic_structure = get_output_from_qchem(qc_inp,processors=ncpu,return_electronic_structure=True)
         except:
             with open("ERROR", "w") as file:
                 file.write("Error occurred during QChem job. Help.\n" + os.getcwd())
             exit()
+    # Your process here
+
+    end_time = time.process_time()
+    execution_time = end_time - start_time
+    print("Execution time:", execution_time, "seconds")
+
     # Job completed successfully
     readqchem(output, molecule, n, nstates,spin_flip)
+    molecule.update_mo_coefficients(electronic_structure['coefficients'])
+   
     # Append f.out content to f.all
     with open("f.all", "a") as f_all:
         f_all.write(output)
     return 
+   
 
+ 
 def readqchem(output, molecule, natoms, nst,spin_flip):
     reduced_natoms = sum(flag.lower() != 'yes' for flag in molecule.dissociation_flags)
     ndim = 3 * reduced_natoms

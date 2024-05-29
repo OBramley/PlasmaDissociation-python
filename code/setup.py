@@ -61,6 +61,7 @@ def create_geom(n,nmod,T,modes,m,mom_num):
     Ay = Ay.reshape(n, nmod, order = 'F')
     Az = Az.reshape(n, nmod, order = 'F')
     rn = np.random.randn(nmod, mom_num)  # Use np.random.randn for standard normal distribution
+    m=m*1822.8885300626
     # Initialize arrays for random
     Meff = np.zeros(nmod)
     rv = np.zeros((nmod, mom_num))
@@ -123,13 +124,14 @@ if __name__ == "__main__":
         f.write(opt_geoms)
 
     # Extract masses of atoms   
-    masses=(qc_inp.molecule.get_atomic_numbers())
+    masses=(qc_inp.molecule.get_atomic_masses())
     Px, Py, Pz = create_geom(inputs["run"]["Atoms"],num_modes,inputs["run"]["Temp"],modes,masses,inputs["setup"]["repeats"])
     # Extract atom symbols
     atoms=qc_inp.molecule.get_symbols()
     # Write momenta files to repetition folder
     for j in range(inputs["setup"]["repeats"]):
         with open('../rep-'+str(j+1)+'/Geometry', 'w') as file:
+        # with open('Geometry', 'w') as file:
             file.write(opt_geoms)
             file.write("momentum\n")
             # Write Px, Py, and Pz for each atom on the same line
