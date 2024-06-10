@@ -260,6 +260,10 @@ def fragements(molecule,spin_flip):
                     molecule.multiplicity = 2
             molecule.dissociation_flags[i - 1] = 'YES'
             dissociated = 1
+            molecule.forces = np.delete(molecule.forces, 3 * (j-1))
+            molecule.forces = np.delete(molecule.forces, 3 * (j-1))
+            molecule.forces = np.delete(molecule.forces, 3 * (j-1))
+            j -= 1
         j += 1
 
     return molecule, dissociated
