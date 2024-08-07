@@ -5,12 +5,9 @@ import init
 import elec
 import prop
 import output as out
-import result
 import json
-import time 
 import qchem as qc
 
-start_time = time.time()
 if __name__ == "__main__":
     # Load inputs
     with open('../inputs.json') as f:
@@ -81,6 +78,6 @@ for i in range(int(startstep), endstep+1):
         Guess = True
     else:
         Guess = False
-result.process_results()
-end_time=time.time()
-print("Time taken to run: ", end_time-start_time)
+
+with open("output/complete.all", "w") as complete_file:
+    complete_file.write("Complete")

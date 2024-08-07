@@ -1,21 +1,21 @@
-
 import os
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import json 
+import os.path
 
 with open('inputs.json') as f:
         inputs=json.load(f)
 title=inputs["run"]["Molecule"]
 reps=float(inputs["setup"]["repeats"])
-colors =mpl.colormaps['prism']
+colors=mpl.colormaps['prism']
 def plot_data(filename_in, filename_out, label, no_bonds):
     # Read data from file
     with open(filename_in, 'r') as file:
         lines = file.readlines()
 
     # Extract timesteps and sort them
-    timesteps = [int(line.strip()) for line in lines]
+    timesteps = [int(line.strip())*0.02418884254 for line in lines]
     timesteps.sort()
 
     # Calculate cumulative number of bonds broken
@@ -28,8 +28,8 @@ def plot_data(filename_in, filename_out, label, no_bonds):
     scaled_avg_bonds = [value * 100 for value in avg_bonds]
     # Plot average number of bonds broken
     plt.plot(timesteps, scaled_avg_bonds, label=label)
-    plt.xlabel('Timesteps')
-    plt.ylabel('Bonds broken')
+    plt.xlabel('Femtoseconds (fs)')
+    plt.ylabel('Percentage of bonds broken')
     plt.title('Number of ' + label +' bonds broken in '+title)
     plt.ylim(0, 100)  # Set the y-axis limits
     plt.xlim(0)  # Set the x-axis lower limit to 0
@@ -44,7 +44,7 @@ def plot_data_cum(folder_path, file_contents, filename_in, filename_out, label, 
         lines = file.readlines()
 
     # Extract timesteps and sort them
-    timesteps = [int(line.strip()) for line in lines]
+    timesteps = [int(line.strip())*0.02418884254 for line in lines]
     timesteps.sort()
     # Calculate cumulative number of bonds broken
     cumulative_bonds = [0] * len(timesteps)
@@ -69,23 +69,24 @@ def plot_data_cum(folder_path, file_contents, filename_in, filename_out, label, 
             if(leg_cnt>20):
                 style_choice=style[2]
             filename=name[0:len(name)-len(label)-1]
-            with open(folder_path+filename+'.out', 'r') as file:
-                lines = file.readlines()
-                # Extract timesteps and sort them
-                timesteps = [int(line.strip()) for line in lines]
-                timesteps.sort()
-                # Calculate cumulative number of bonds broken
-                cumulative_bonds = [0] * len(timesteps)
-                for i, timestep in enumerate(timesteps):
-                    cumulative_bonds[i] = cumulative_bonds[i-1] + 1 if i > 0 else 1
-                # Calculate average number of bonds broken
-                avg_bonds = [count/reps for count in cumulative_bonds]
-                scaled_avg_bonds = [value * 100 for value in avg_bonds]
-                # Plot average number of bonds broken
-                plt.plot(timesteps, scaled_avg_bonds, label=filename, alpha=0.5, linestyle=style_choice,color=colors(leg_cnt*10))
-                alpha=alpha-0.1                                  
-    plt.xlabel('Timesteps')
-    plt.ylabel('Bonds broken')
+            if os.path.isfile(filename):
+                with open(folder_path+filename+'.out', 'r') as file:
+                    lines = file.readlines()
+                    # Extract timesteps and sort them
+                    timesteps = [int(line.strip())*0.02418884254 for line in lines]
+                    timesteps.sort()
+                    # Calculate cumulative number of bonds broken
+                    cumulative_bonds = [0] * len(timesteps)
+                    for i, timestep in enumerate(timesteps):
+                        cumulative_bonds[i] = cumulative_bonds[i-1] + 1 if i > 0 else 1
+                    # Calculate average number of bonds broken
+                    avg_bonds = [count/reps for count in cumulative_bonds]
+                    scaled_avg_bonds = [value * 100 for value in avg_bonds]
+                    # Plot average number of bonds broken
+                    plt.plot(timesteps, scaled_avg_bonds, label=filename, alpha=0.5, linestyle=style_choice,color=colors(leg_cnt*10))
+                    alpha=alpha-0.1                                  
+    plt.xlabel('Femtoseconds (fs)')
+    plt.ylabel('Percentage of bonds broken')
     plt.title('Number of ' + label +' bonds broken in '+title)
     if leg_cnt>10:
         plt.legend(ncol=2)
@@ -111,7 +112,7 @@ def plot_data_all(folder_path,file_contents,filename_out):
                         lines = file.readlines()
                     bond_cnt=bond_cnt*reps
                     # Extract timesteps and sort them
-                    timesteps = [int(line.strip()) for line in lines]
+                    timesteps = [int(line.strip())*0.02418884254 for line in lines]
                     timesteps.sort()
                     # Calculate cumulative number of bonds broken
                     cumulative_bonds = [0] * len(timesteps)
@@ -123,8 +124,8 @@ def plot_data_all(folder_path,file_contents,filename_out):
                     scaled_avg_bonds = [value * 100 for value in avg_bonds]
                     # Plot average number of bonds broken
                     plt.plot(timesteps, scaled_avg_bonds, label=filename_without_extension)
-    plt.xlabel('Timesteps')
-    plt.ylabel('Bonds broken')
+    plt.xlabel('Femtoseconds (fs)')
+    plt.ylabel('Percentage of bonds broken')
     plt.ylim(0, 100)  # Set the y-axis limits
     plt.xlim(0)
     plt.legend()
@@ -135,7 +136,7 @@ with open('results/bondarr.txt', 'r') as file:
     file_contents = file.read()
 
 folder_path = 'results/'  # Replace with the actual folder path
-os.mkdir('results/graphs')
+# os.mkdir('results/graphs')
 plot_folder='results/graphs/'
 # Iterate over the files in the folder
 for filename in os.listdir(folder_path):
@@ -169,6 +170,12 @@ for filename in os.listdir(folder_path):
                     if line.endswith(filename_without_extension):
                         bond_cnt+=1
                 plot_data_cum(folder_path,file_contents, os.path.join(folder_path, filename),plot_folder+filename_without_extension+'_cum.png', filename_without_extension, reps*bond_cnt)
+
+# bond_groups=[[['Si-O'],[1,2],[1,3],[1,4],[1,5]],
+#                  [['O-C'][2,6],[3,7],[4,8],[4,9]],
+#                  [['C-C'][6,10],[7,11],[8,12],[9,13]],
+# [['C-H_middle'][6,14],[6,15],[7,16],[7,17],[8,18],[8,19],[9,20],[9,21]],
+            # [['C-H_terminal'][10,22],[10,23],[10,24],[11,25],[11,26],[11,27],[12,28],[12,29],[12,30],[13,31],[13,32],[13,33]]]
 
 
 plot_data_all(folder_path,file_contents,plot_folder+'all.png')

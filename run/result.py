@@ -6,21 +6,25 @@ from init import Molecule
 import networkx as nx
 import shutil
 
-def process_results():
+def process_results(rep):
     # 1.read in the bonding array
     bondarr = read_bondarr()
     # # 2. detect dissociation
-    detect_dissociation(bondarr)
+    bond = detect_dissociation(bondarr,rep)
     # 3. Find fragments.
-    fragments()
+    frag = fragments(rep)
+
+    return bond, frag
+
+def compile(bonds,frags,bond_groups=None):
     # 4. compile dissociation data
-    compile_results()
+    compile_results(bonds,bond_groups=None)
     # 5. Compile fragment data
-    combine_fragments()
+    combine_fragments(frags)
 
 def read_bondarr():
     bondarr = {}
-    with open('../results/bondarr.txt', 'r') as file:
+    with open('results/bondarr.txt', 'r') as file:
         for line in file:
             line = line.strip()
             if line:  # Skip empty lines
@@ -32,19 +36,19 @@ def read_bondarr():
     
     return bondarr
 
-def detect_dissociation(bondarr):
+def detect_dissociation(bondarr,rep):
 
     # Read the input data from a file
-    with open('output/xyz.all', 'r') as f:
+    with open('rep-'+str(rep)+'output/xyz.all', 'r') as f:
         lines = f.readlines()
 
     # Initialize variables to store the current timestep, atom data, and dissociation flag
     timestep = None
     atoms = {}
     dissociated_bonds = set()  # Keep track of dissociated bond pairs
-
+    store=[]
     # Open the output file for writing
-    with open('output/dissociation.out', 'w') as output:
+    with open('rep-'+str(rep)+'output/dissociation.out', 'w') as output:
         # Iterate through the lines and process the data
         for line in lines:
             parts = line.split()
@@ -56,12 +60,12 @@ def detect_dissociation(bondarr):
                             atom1 = atoms[i]        
                             atom2 = atoms[j]
                             distance = ((atom1[1] - atom2[1])**2 + (atom1[2] - atom2[2])**2 + (atom1[3] - atom2[3])**2)**0.5
-                            if distance > 5.0:  # Adjust this threshold as needed
+                            if distance > 4.76:  # Adjust this threshold as needed
                                 broken_bond_str = f"{i}-{j}:{bond_type}"  # Include bond type in the output
                                 if broken_bond_str not in dissociated_bonds:
                                     output.write(f"Dissociation detected at timestep {timestep}, Broken bond: {broken_bond_str}\n")
                                     dissociated_bonds.add(bonded_pair)
-                                    
+                                    store.append([timestep,bond_type,[i,j]])
                     atoms = {}
                 timestep = float(parts[1])
             elif len(parts) == 5 and parts[0].isdigit():
@@ -69,32 +73,29 @@ def detect_dissociation(bondarr):
                 atom_info = [parts[1]] + [float(x) for x in parts[2:]]
                 atoms[atom_num] = atom_info
 
-def compile_results():
-    with open('output/dissociation.out', "r") as f:
-        lines = f.readlines()
+    return store
 
-    for line in lines:
-        if line.startswith("Dissociation detected"):
-            parts = line.split(", ")
-            timestep = int(float(parts[0].split(" ")[-1]))
-            bond_info = parts[1].split(":")
-            bond_type = bond_info[2].strip() # Remove leading and trailing whitespace
-            bond_number = bond_info[1].strip()
-            
-            # Write to bond-type-specific output file
-            bond_type_file = os.path.join("../results", f"{bond_type}.out")
-            with open(bond_type_file, "a") as f_out:
-                f_out.write(f"{timestep}\n")
-                
+def compile_results(bonds):
+    bonds.sort(key=lambda x:x[0])
+    for i in range(len(bonds)):
+        bond=bonds[i]
+        timestep=bond[0]
+        bond_type=bond[1]
+        bond_number=f"{bond[2][0]}-{bond[2][1]}"
+        bond_number_file = os.path.join("results", f"{bond_number}.out")
+        with open(bond_number_file, "a") as f_out:
+            f_out.write(f"{timestep}\n")
+        
+        # Write to bond-type-specific output file
+        bond_type_file = os.path.join("results", f"{bond_type}.out")
+        with open(bond_type_file, "a") as f_out:
+            f_out.write(f"{timestep}\n")
 
-            
-            # Write to old output file format and order by timestep
-            bond_number_file = os.path.join("../results", f"{bond_number}.out")
-            with open(bond_number_file, "a") as f_out:
-                f_out.write(f"{timestep}\n")
+       
 
-def fragments():
-    molecule= Molecule.from_json('output/molecule.json')
+
+def fragments(rep):
+    molecule= Molecule.from_json('rep-'+str(rep)+'output/molecule.json')
     coordinates = molecule.coordinates
     fragment_formulas = {} 
     atom_coordinates = [(i, molecule.symbols[i], molecule.coordinates[i, 0], molecule.coordinates[i, 1], molecule.coordinates[i, 2]) for i in range(len(molecule.symbols))]
@@ -141,6 +142,8 @@ def fragments():
             cfho_formula += f"H{formula['H']}"
         if 'O' in formula:
             cfho_formula += f"O{formula['O']}"
+        if 'Si' in formula:
+            cfho_formula += f"Si{formula['Si']}"
 
         if cfho_formula in fragment_formulas:
             fragment_formulas[cfho_formula] += 1
@@ -166,28 +169,44 @@ def fragments():
             cfho_formula += f"H{formula['H']}"
         if 'O' in formula:
             cfho_formula += f"O{formula['O']}"
+        if 'Si' in formula:
+            cfho_formula += f"Si{formula['Si']}"
 
         if cfho_formula in fragment_formulas:
             fragment_formulas[cfho_formula] += 1
         else:
             fragment_formulas[cfho_formula] = 1
-
-    with open("output/fragments.out", "w") as count_file:
+    store=[]
+    with open('rep-'+str(rep)+'output/fragments.out', "w") as count_file:
         count_file.write("Fragment Formulas:\n")
         for formula, count in fragment_formulas.items():
             count_file.write(f"{formula}: {count}\n")
-
+            store.append([formula,count])
+    
+    return store
 
 def distance(point1, point2):
     x1, y1, z1 = point1[2:]
     x2, y2, z2 = point2[2:]
     return ((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2) ** 0.5
 
-def combine_fragments():
-    if os.path.exists("../results/fragments.out"):
-       combine_fragment_counts("output/fragments.out", "../results/fragments.out", "../results/fragments.out")
-    else:
-        shutil.copy2("output/fragments.out","../results")
+def combine_fragments(frags):
+    combo=[]
+    for i in range(len(frags)):
+        frag=frags[i][0]
+        cnt=frags[i][1]
+        if frag not in combo:
+            combo.append(frags[i])
+        else: 
+            index=combo.index(frag)
+            combo[index[0],1]=combo[index[0],1]+cnt
+    
+    combo.sort(key=lambda x:x[1], reverse=True)
+    with open("results/fragments.out", 'w') as file:
+        file.write("Fragment Formulas (Most to Least Common):\n")
+        for i in range(len(combo)):
+            file.write(f"{combo[i,0]}: {combo[i,1]}\n")
+
 
 def combine_fragment_counts(file1, file2, output_file):
     # Read fragment counts from the first file
@@ -234,3 +253,17 @@ def write_fragment_counts(file_path, fragment_formulas):
         file.write("Fragment Formulas (Most to Least Common):\n")
         for formula, count in sorted_formulas:
             file.write(f"{formula}: {count}\n")
+
+if __name__ == "__main__":
+    with open('inputs.json') as f:
+        inputs=json.load(f)
+    reps=inputs["run"]["repeats"]
+    bonds=[]
+    frags=[]
+    for i in range(1,reps+1):
+        bond, frag = process_results(i)
+        bonds.append(bond)
+        frags.append(frag)
+
+    
+    compile(bonds,frags)

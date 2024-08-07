@@ -39,12 +39,12 @@ def organise_modes(modes,atoms):
    
     return numeric_modes
 
-def bondarr(molecule):
+def bondarr(molecule,location):
     bonds = molecule.get_connectivity()
     atoms = molecule.get_symbols()
     unique_bonds = set()
     
-    with open("../results/bondarr.txt", "w") as file:
+    with open(location, "w") as file:
         for bond in bonds:
             sorted_bond = tuple(sorted(bond))
             if sorted_bond not in unique_bonds:
@@ -62,7 +62,7 @@ def create_geom(n,nmod,T,modes,m,mom_num):
     Az = Az.reshape(n, nmod, order = 'F')
     rn = np.random.randn(nmod, mom_num)  # Use np.random.randn for standard normal distribution
     m=m*1822.8885300626
-    T=T*0.0000031668
+    Temp=T*0.0000031668
     print(T)
     # Initialize arrays for random
     Meff = np.zeros(nmod)
@@ -71,7 +71,45 @@ def create_geom(n,nmod,T,modes,m,mom_num):
         for j in range(n):
             print(m[j])
             Meff[i] = Meff[i]+np.sum(((Ax[j, i]**2) + (Ay[j, i]**2) + (Az[j, i]**2)) * m[j])
-        rv[i, :] = rn[i, :] * np.sqrt(2 * T / Meff[i])
+        rv[i, :] = rn[i, :] * np.sqrt(2 * Temp / Meff[i])
+    # Calculate the velocity by applying it through the tranformation matrix of normal modes.
+    Vx = np.dot(Ax, rv)
+    Vy = np.dot(Ay, rv)
+    Vz = np.dot(Az, rv)
+    Px = np.zeros((n,mom_num))
+    Py = np.zeros((n,mom_num))
+    Pz = np.zeros((n,mom_num))
+    for i in range(n):
+        Px[i,:] = Vx[i,:]*m[i]
+        Py[i,:] = Vy[i,:]*m[i]
+        Pz[i,:] = Vz[i,:]*m[i]
+    
+    return Px, Py, Pz
+
+def create_geom_mult_t_1(n,nmod,modes,m,mom_num):
+    Ax = modes[:,0]
+    Ay = modes[:,1]
+    Az = modes[:,2]
+    Ax = Ax.reshape(n, nmod, order = 'F')
+    Ay = Ay.reshape(n, nmod, order = 'F')
+    Az = Az.reshape(n, nmod, order = 'F')
+    rn = np.random.randn(nmod, mom_num)  # Use np.random.randn for standard normal distribution
+    m=m*1822.8885300626
+    # Initialize arrays for random
+    Meff = np.zeros(nmod)
+    rv = np.zeros((nmod, mom_num))
+    for i in range(nmod):
+        for j in range(n):
+            Meff[i] = Meff[i]+np.sum(((Ax[j, i]**2) + (Ay[j, i]**2) + (Az[j, i]**2)) * m[j])
+        rv[i, :] = rn[i, :] * np.sqrt(2)*(1/np.sqrt(Meff[i]))
+    return rv, Ax, Ay, Az 
+
+def create_geom_mult_t_2(n,nmod,T,Meff,rn,m,Ax, Ay, Az,mom_num):
+    Temp=T*0.0000031668
+    rv = np.zeros((nmod, mom_num))
+    for i in range(nmod):
+        rv[i, :] = rn[i, :] * np.sqrt(Temp)
+    
     # Calculate the velocity by applying it through the tranformation matrix of normal modes.
     Vx = np.dot(Ax, rv)
     Vy = np.dot(Ay, rv)
@@ -92,8 +130,8 @@ if __name__ == "__main__":
     # Load molecule coordinates from pubchem
     molecule = get_geometry_from_pubchem(inputs["run"]["Molecule"])
     # Write bond breaking file to results folder
-    if inputs["run"]["method"] == "QChem":
-        qc.initial_conditions
+    # if inputs["run"]["method"] == "QChem":
+    #     qc.initial_conditions
     # Optimise the molecule
     qc_inp = QchemInput(molecule,
                         jobtype='opt',
@@ -109,7 +147,13 @@ if __name__ == "__main__":
         f.write(output)
     pasrser_output = basic_optimization(output)
     opt_geoms=(pasrser_output['optimized_molecule'])
-    bondarr(opt_geoms)
+    if(inputs["run"]["Temp"]=='m'):
+        for i in range(inputs["Temps"]["num"]):
+            location="../"+str(inputs["Temps"]["t"][i])+"/results/bondarr.txt"
+            bondarr(opt_geoms,location)
+    else:
+        location="../results/bondarr.txt"
+        bondarr(opt_geoms,location)
     # Find Normal modes
     qc_inp = QchemInput(opt_geoms,
                         jobtype='FREQ',
@@ -130,18 +174,37 @@ if __name__ == "__main__":
 
     # Extract masses of atoms   
     masses=(qc_inp.molecule.get_atomic_masses())
-    Px, Py, Pz = create_geom(natoms,num_modes,inputs["run"]["Temp"],modes,masses,inputs["setup"]["repeats"])
     # Extract atom symbols
     atoms=qc_inp.molecule.get_symbols()
-    # Write momenta files to repetition folder
-    for j in range(inputs["setup"]["repeats"]):
-        with open('../rep-'+str(j+1)+'/Geometry', 'w') as file:
-            file.write(opt_geoms)
-            file.write("momentum\n")
-            # Write Px, Py, and Pz for each atom on the same line
-            for atom in range(natoms):
-                # Access the Px, Py, and Pz values using the corresponding indices
-                px_value = Px[atom, j]
-                py_value = Py[atom, j]
-                pz_value = Pz[atom, j]
-                file.write(f'{px_value}  {py_value}  {pz_value}\n')
+    if(inputs["run"]["Temp"]=='m'):
+        rn, Ax, Ay, Az = create_geom_mult_t_1(natoms,num_modes,modes,masses,inputs["setup"]["repeats"])
+        for i in range(inputs["Temps"]["num"]):
+            Px, Py, Pz = create_geom(natoms,num_modes,inputs["Temps"]["t"][i],modes,masses,inputs["setup"]["repeats"])
+            # Px, Py, Pz = create_geom_mult_t_2(natoms,num_modes,inputs["Temps"]["t"][i],rn,masses,Ax, Ay, Az,inputs["setup"]["repeats"])
+            # Write momenta files to repetition folder
+            for j in range(inputs["setup"]["repeats"]):
+                with open('../'+str(inputs["Temps"]["t"][i])+'/rep-'+str(j+1)+'/Geometry', 'w') as file:
+                    file.write(opt_geoms)
+                    file.write("momentum\n")
+                    # Write Px, Py, and Pz for each atom on the same line
+                    for atom in range(natoms):
+                        # Access the Px, Py, and Pz values using the corresponding indices
+                        px_value = Px[atom, j]
+                        py_value = Py[atom, j]
+                        pz_value = Pz[atom, j]
+                        file.write(f'{px_value}  {py_value}  {pz_value}\n')
+
+    else:
+        Px, Py, Pz = create_geom(natoms,num_modes,inputs["run"]["Temp"],modes,masses,inputs["setup"]["repeats"])
+        # Write momenta files to repetition folder
+        for j in range(inputs["setup"]["repeats"]):
+            with open('../rep-'+str(j+1)+'/Geometry', 'w') as file:
+                file.write(opt_geoms)
+                file.write("momentum\n")
+                # Write Px, Py, and Pz for each atom on the same line
+                for atom in range(natoms):
+                    # Access the Px, Py, and Pz values using the corresponding indices
+                    px_value = Px[atom, j]
+                    py_value = Py[atom, j]
+                    pz_value = Pz[atom, j]
+                    file.write(f'{px_value}  {py_value}  {pz_value}\n')
