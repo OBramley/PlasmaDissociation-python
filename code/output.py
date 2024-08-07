@@ -9,8 +9,8 @@ def output_xyz(molecule):
         # Write the timestep
         xyz_file.write(f"Timestep: {molecule.timestep}\n")
 
-        for atom_number, (symbol, (x, y, z)) in enumerate(zip(molecule.symbols, molecule.coordinates), start=1):
-            xyz_file.write(f"{atom_number} {symbol}   {x:.15f}   {y:.15f}   {z:.15f}\n")
+        for atom_number, (atom, (x, y, z)) in enumerate(zip(molecule.atoms, molecule.coordinates), start=1):
+            xyz_file.write(f"{atom_number} {atom}   {x:.15f}   {y:.15f}   {z:.15f}\n")
 
         # Write a dashed line as a separator
         xyz_file.write("-" * 40 + "\n")

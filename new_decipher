@@ -1,0 +1,22 @@
+molecule1 = init.initialize_structure()
+    reads in geometry data
+    reads in momentum data 
+    sets amplitudes 
+    creates molecule and returns it
+molecule2= init.create_empty_molecule()
+molecule1 = elec.run_elec_structure(molecule1, ncpu,n,nstates,spin_flip,method, Guess=False)
+    runs electronic structure calc
+out.output_molecule()
+    outputs to molecule.json
+
+Loop through propagation 
+molecule2 = prop.prop_1(molecule1, molecule2, n, nstates, increment)
+    velocities = np.zeros((natoms,3))
+    mass = np.zeros((natoms))
+    forces_1 = molecule1.forces
+    scf_energy_1 = molecule1.scf_energy
+    molecule2 = molecule1.copy()
+
+molecule2 = elec.run_elec_structure(molecule2, ncpu,n,nstates,spin_flip,method,Guess=Guess)
+     runs electronic structure calc
+molecule1.elecinfo = molecule2.elecinfo

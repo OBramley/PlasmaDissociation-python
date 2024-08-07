@@ -4,10 +4,10 @@
 
 
 
-def run_elec_structure(molecule, ncpu,n,nstates,spin_flip, method,Guess):
+def run_elec_structure(molecule, ncpu,spin_flip, method,Guess):
     if method == 'QChem':
         import qchem as qc
-        qc.run_qchem(ncpu, molecule,n, nstates,spin_flip,Guess=Guess)
+        qc.run_qchem(ncpu, molecule,spin_flip,Guess=Guess)
     elif method == 'PySCF': 
         import elec_pyscf as pyscf
         pyscf.run_pySCF(molecule,Guess)

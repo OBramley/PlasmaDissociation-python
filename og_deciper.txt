@@ -1,0 +1,195 @@
+Geometry set up
+
+Run.py 
+Takes inputs.py as an input 
+Copy to run folder
+    run.py
+    result.py
+    collate.py
+    inputs.py
+    analysis.x
+Copy to each repetition folder
+    Geometry.no
+    Conversion.py
+    prop_prelim.x
+    Prop_corr.x
+    q_to_prop.x
+In each repetition folder run 
+    chmod +x+u on all .x files
+
+run main.py 
+Read in conditions
+Restart == NO 
+    Call process_geometry_file()  in main.py 
+        makes t.0 and t.ini 
+    Call Conversion.make_geometry_input(t.0)
+        reads t.0 
+        writes geom.in 
+    Call run_qchem 
+        calls create_qchem_input 
+            produces f.inp 
+        submits f.inp to produce f.out file 
+
+    ./q_to_prop.x
+        reads natom, nst
+        ndim=3*natom
+        allocates c(ndim,nst,nst), f(ndim,nst), e(nst)
+        reads in the exciation energy to e
+        reads gradient of the state energy into f
+        f=-f
+        prints data to t.0
+    writes t.0 to t1.all 
+Restart == YES
+   t.0 exists ? 
+        Yes 
+            read in data
+        No 
+            Run same process as Restart ==No 
+
+
+Loop over timesteps
+    ./prop_prelim.x t
+        opens t.0 
+        reads natom, nst, branch, time, timesteps
+        ndim=3*natom
+        allocate(r0(ndim),p0(ndim),r1(ndim),p1(ndim), atom(natom))
+        read nc, mult
+        Read geometries into r0 and atoms in atoms
+        Read into p0
+        allocate(A0(nst), A1(nst), Ab(nst), Es0(nst), Fs0(ndim,nst), Cs0(ndim,nst,nst), HE_0(nst,nst), F0(ndim), V0(ndim), V1(ndim), M(ndim))
+        Read amplitudes into A0
+        Set masses i=1,natom --- M(i*3-2:i*3)=atomic_mass*Mau,  Mau=1822.887
+        Read potential energies into Es0
+        nr=nst*ndim
+        Read forces into Fs0 n=1,nr
+        nr=ndim*nst*(nst-1)/2
+        Read Couplings into Cs0 n=1, nr 
+            read(1,*) val,i,k,j
+            Cs0(j,i,k)=val
+            Cs0(j,k,i)=-Cs0(j,i,k)
+        close t.0
+        V0=P0/M
+        F0=CompForceEhr(A0,Fs0,Es0,Cs0,nst,ndim)
+            Function CompForceEhr(A,F,E,C,nst,ndim) result(ForceVector)
+                implicit none
+                real (kind=8) :: ForceVector(ndim)
+                real (kind=8) :: F(ndim,nst)
+                real(kind=8)::C(ndim,nst,nst)
+                real (kind=8) :: f1(ndim),f2(ndim)
+                real (kind=8) :: E(nst),ae
+                complex(8)    :: a(nst)
+                integer  :: ndim,nst,i,j
+                F1=0.d0
+                F2=0.d0
+                do i=1,nst
+                    F1=F1+F(:,i)*cdabs(A(i))**2
+                end do
+                do i=1,nst
+                    do j=i+1,nst
+                    ae=2.d0*dreal(dconjg(A(i))*A(j))*(E(i)-E(j))
+                    F2=F2+ae*C(:,i,j)
+                    end do
+                end do
+                ForceVector=F1+F2
+                return
+            end function CompForceEhr
+        E0=sum(Es0*(abs(A0)**2))+sum(P0*V0)/2.
+
+        do n1=1,nst
+            HE_0(n1,n1)=Es0(n1)+77.67785291
+            do n2=n1+1,nst
+                HE_0(n1,n2)=-ii*sum(V0*Cs0(:,n1,n2))
+                HE_0(n2,n1)=-HE_0(n1,n2)
+            end do
+        end do
+
+        ii is imaginary i
+        Ab=matmul( magnus2( -ii*HE_0, -ii*HE_0, TimeStep/20), A0 )
+            complex*16,intent(in) :: H0(:,:), H1(:,:)
+            real*8 :: dt
+            complex*16,dimension(size(H0,1),size(H0,2)) :: magH
+            complex*16,dimension(size(H0,1),size(H0,2)) :: a0, a1, a2, W1, Htr    !derivatives at t/2
+            complex*16 :: Hav
+            integer :: ndim, i
+            ndim = size(H0,1)
+            Hav = 0.d0
+            do i = 1, ndim
+                Hav = Hav + H0(i,i) + H1(i,i)
+            enddo
+            Hav = Hav / dble( 2*ndim )
+            ! The trace matrix
+            Htr = 0.d0
+            do i = 1, ndim
+                Htr(i,i) = Hav
+            enddo
+            a0 =(H1+H0)/2.d0 - Htr
+            W1 = dt * a0
+            magH = exp_pade( W1)*exp(Hav*dt)
+                function exp_pade( A, t_in ) result ( expA )
+                    complex*16,intent(in) :: A(:,:)
+                    real*8,    optional   :: t_in
+                    complex*16            :: expA(size(A,1),size(A,2))
+                    integer :: n
+                    integer :: ideg, m , ipiv(size(A,1)), &
+                            iexph, & ! locates the start of expA inthe work array wsp
+                            lwsp, ldh, ns, iflag
+                    complex*16 :: wsp( 4*size(A,1)**2 + 10 +1 )
+                    real*8 ::  t
+                    t = 1.d0
+                    if( present(t_in) ) t = t_in
+                    ideg = 6
+                    m    = size(A,1)
+                    ldh  = m
+                    lwsp = size(wsp)
+                    if( maxval(abs(A)) < 1.d-7 )then
+                    expA = 0.
+                    do n = 1, m
+                        expA(n,n) = (1.d0,0.d0)
+                    enddo
+                    else
+                    call ZGPADM( ideg, m, t, A, ldh, wsp, lwsp, ipiv, iexph, ns, iflag )
+                        THIS IS a LIBRARY FUNCTION in expokit.f
+                    expA = reshape( wsp(iexph:iexph+m**2-1), (/m,m/) )
+                    endif
+                    return
+                    end function exp_pade
+        F0 = CompForceEhr(A0,Fs0,Es0,Cs0,nst,ndim)/10.
+        do im=1,9
+            A1 = matmul( magnus2( -ii*HE_0, -ii*HE_0, TimeStep/10), Ab )
+            Ab=A1
+            F0 = F0+CompForceEhr(Ab,Fs0,Es0,Cs0,nst,ndim)/10.
+        end do
+        R1 = R0 + TimeStep*V0 + TimeStep**2/2.d0 * F0/M
+        P1 = P0 + TimeStep * F0
+        V1=P1/M
+        time=time+TimeStep
+
+        Write to f_inp.p 
+            natom, nst 
+            branch
+            time, TimeStep
+            nc, mult 
+            write atoms and r1 
+            write p1 
+            wite A1 
+            
+
+
+    Conversion.make_geometry_input('t.p')
+        reads t.p 
+        writes geom.in 
+    
+    Call run_qchem 
+        calls create_qchem_input 
+            produces f.inp 
+        submits f.inp to produce f.out file 
+    ./q_to_prop.x
+        reads natom, nst
+        ndim=3*natom
+        allocates c(ndim,nst,nst), f(ndim,nst), e(nst)
+        reads in the exciation energy to e
+        reads gradient of the state energy into f
+        f=-f
+        prints data to t.p
+
+    ./prop_corr.x 

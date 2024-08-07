@@ -16,12 +16,6 @@ from pyqchem import get_output_from_qchem
 from pyqchem.parsers.parser_optimization import basic_optimization
 from pyqchem.parsers.parser_frequencies import basic_frequencies
 
-np.set_printoptions(precision=30)
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.float128):
-            return float(obj)
-        return super(NumpyEncoder, self).default(obj)
 
 def convert_to_bohr(coordinates):
     angstrom_to_bohr = 1.88973
@@ -138,37 +132,15 @@ if __name__ == "__main__":
     Px, Py, Pz = create_geom(natoms,num_modes,inputs["run"]["Temp"],modes,masses,inputs["setup"]["repeats"])
     # Extract atom symbols
     atoms=qc_inp.molecule.get_symbols()
-    coords=np.zeros(natoms,3)
-    for i in range(natoms):
-        coords[i,:]=opt_geoms[1:,:]   
     # Write momenta files to repetition folder
     for j in range(inputs["setup"]["repeats"]):
-        with open('../rep-'+str(j+1)+'output/xyz.all','w') as geomfile: 
-            geom_file.write('Timestep: 0 \n')
-            geom_file.write(opt_geoms)
-        
-        with open('../rep-'+str(j+1)+'output/xyz.all','w') as momentafile: 
-            momentafile.write('Timestep: 0 \n')
+        with open('../rep-'+str(j+1)+'/Geometry', 'w') as file:
+            file.write(opt_geoms)
+            file.write("momentum\n")
+            # Write Px, Py, and Pz for each atom on the same line
             for atom in range(natoms):
                 # Access the Px, Py, and Pz values using the corresponding indices
                 px_value = Px[atom, j]
                 py_value = Py[atom, j]
                 pz_value = Pz[atom, j]
-                momentafile.write(f'{px_value}  {py_value}  {pz_value}\n')
-            # Write a dashed line as a separator
-            momentafile.write("-" * 40 + "\n")
-        
-        momenta=np.zeros(natoms,3)
-        for i in range(natoms):
-            momenta[i,0]=Px[i, j]
-            momenta[i,1]=Py[i, j]
-            momenta[i,2]=Pz[i, j]
-
-        data= {
-            "Timestep":0,
-            "Atoms":atoms,
-            "Coordinates":coords,
-            "Momenta":momenta
-        }
-        with open('../rep-'+str(j+1)+'output/molecule.json', 'w') as json_file:
-            json.dump(data, json_file, indent=2, cls=NumpyEncoder)
+                file.write(f'{px_value}  {py_value}  {pz_value}\n')

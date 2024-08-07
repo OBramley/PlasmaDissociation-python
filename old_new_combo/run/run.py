@@ -71,21 +71,35 @@ if __name__=="__main__":
     os.mkdir(EXDIR1+"/results")
     os.mkdir(EXDIR1+"/setup")
     os.mkdir(EXDIR1+"/setup/tmp")
-    #Copies input files
-    shutil.copy2("restart.py",EXDIR1)
+    EXDIR1C=EXDIR1+"/code"
+    os.mkdir(EXDIR1C)
+    shutil.copy2("run.py",EXDIR1)
+    shutil.copy2("../code/Result.py",EXDIR1C)
+    shutil.copy2("../code/setup.py",EXDIR1C)
+    shutil.copy2("../code/Collate.py",EXDIR1C)
+    shutil.copy2("../code/checker.py",EXDIR1C)
     shutil.copy2("inputs.json",EXDIR1)
-    shutil.copy2("graph.py",EXDIR1)
+    shutil.copy2("../code/analysis.x",EXDIR1C)
+    shutil.copy2("graph.py",EXDIR1C)
+    shutil.copy2("../code/main.py",EXDIR1C)
+    shutil.copy2("../code/Conversion.py",EXDIR1C)
+    shutil.copy2("../code/prop_prelim.x",EXDIR1C)
+    shutil.copy2("../code/prop_corr.x",EXDIR1C)
+    shutil.copy2("../code/q_to_propSCF.x",EXDIR1C)
+    subprocess.run(['chmod', 'u+x', EXDIR1C+'/prop_prelim.x'])
+    subprocess.run(['chmod', 'u+x', EXDIR1C+'/prop_corr.x'])
+    subprocess.run(['chmod', 'u+x', EXDIR1C+'/q_to_propSCF.x'])
+
     for i in range(inputs["setup"]["repeats"]):
         os.mkdir(EXDIR1+"/rep-"+str(i+1))
         os.mkdir(EXDIR1+"/rep-"+str(i+1)+"/output")
         os.mkdir(EXDIR1+"/rep-"+str(i+1)+"/tmp")
-        if(inputs["run"]["Geom_flg"] ==0):
-            shutil.copy2("../"+inputs["run"]["Molecule"]+"/Geom/Geometry."+str(i+inputs["run"]["Geom_start"]),EXDIR1+"/rep-"+str(i+1)+"/Geometry")
-    if HPCFLG==1:
-            shutil.copytree("../code", EXDIR1+'/code')
+        # if(inputs["run"]["Geom_flg"] ==0):
+            # shutil.copy2("../"+inputs["run"]["Molecule"]+"/Geom/Geometry."+str(i+inputs["run"]["Geom_start"]),EXDIR1+"/rep-"+str(i+1)+"/Geometry")
+    # if HPCFLG==1:
+    #         shutil.copytree("../code", EXDIR1+'/code')
     if(inputs["run"]["Geom_flg"] ==0):
         shutil.copy2("../"+inputs["run"]["Molecule"]+"/bondarr.txt",EXDIR1+"/results")
-
 
     os.chdir(EXDIR1)
     EXDIR1=os.getcwd()
@@ -116,29 +130,28 @@ if __name__=="__main__":
             command = ['qsub','-N','Setup_'+inputs["setup"]["Runfolder"], file2]
             # subprocess.call(command)
         
-        
         file1="Plasma_"+inputs["setup"]["Runfolder"]+"_1.sh"
         f=open(file1,"w")
         f.write("#$ -cwd -V \n")
-        f.write("#$ -l h_vmem=1G,h_rt=05:00:00 \n")
+        f.write("#$ -l h_vmem=1G,h_rt=48:00:00 \n")
         f.write("#$ -N Plasma_"+inputs["setup"]["Runfolder"]+"_1 \n")
         f.write("#$ -pe smp "+str(inputs["setup"]["cores"])+" \n") #Use shared memory parallel environemnt 
         f.write("#$ -t 1-"+str(inputs["setup"]["repeats"])+" \n")
-        if(inputs["run"]["GPU"]==1):
-            f.write('#$ -l coproc_p100=1 \n')
-        if(inputs["run"]["method"]=="QChem"):
-            f.write("module load test qchem \n")
-            f.write("module load qchem \n")
-            f.write("mkdir $TMPDIR/qchemlocal\n")
-            f.write('tar -xzvf /nobackup/'+getpass.getuser()+'/scatter/qchem.tar.gz -C $TMPDIR/qchemlocal\n')
-            f.write('qchemlocal=$TMPDIR/qchemlocal/apps/applications/qchem/6.0.1/1/default\n')
-            f.write('export QCHEM_HOME="$qchemlocal"\n')
-            f.write('export QC="$qchemlocal"\n')
-            f.write('export QCAUX="$QC/qcaux"\n')
-            f.write('export QCPROG="$QC/exe/qcprog.exe"\n')
-            f.write('export QCPROG_S="$QC/exe/qcprog.exe_s"\n')
-            f.write('export PATH="$PATH:$QC/exe:$QC/bin"\n')
-            f.write("export QCSCRATCH="+EXDIR1+"/setup/tmp \n")
+        # if(inputs["run"]["GPU"]==1):
+            # f.write('#$ -l coproc_p100=1 \n')
+        # if(inputs["run"]["method"]=="QChem"):
+        f.write("module load test qchem \n")
+        f.write("module load qchem \n")
+        f.write("mkdir $TMPDIR/qchemlocal\n")
+        f.write('tar -xzvf /nobackup/'+getpass.getuser()+'/scatter/qchem.tar.gz -C $TMPDIR/qchemlocal\n')
+        f.write('qchemlocal=$TMPDIR/qchemlocal/apps/applications/qchem/6.0.1/1/default\n')
+        f.write('export QCHEM_HOME="$qchemlocal"\n')
+        f.write('export QC="$qchemlocal"\n')
+        f.write('export QCAUX="$QC/qcaux"\n')
+        f.write('export QCPROG="$QC/exe/qcprog.exe"\n')
+        f.write('export QCPROG_S="$QC/exe/qcprog.exe_s"\n')
+        f.write('export PATH="$PATH:$QC/exe:$QC/bin"\n')
+        f.write("export QCSCRATCH="+EXDIR1+"/rep-$SGE_TASK_ID/tmp \n")
         f.write("cd "+EXDIR1+"/rep-$SGE_TASK_ID \n")
         f.write("python ./../code/main.py")
         f.close()
@@ -155,17 +168,17 @@ if __name__=="__main__":
             f.write("#$ -t 1-"+str(inputs["setup"]["repeats"])+" \n")
             f.write("module load qchem \n")
             f.write("mkdir $TMPDIR/qchemlocal\n")
-            if(inputs["run"]["method"]=="QChem"):
-                f.write("mkdir $TMPDIR/qchemlocal\n")
-                f.write("tar -xzvf /nobackup/"+getpass.getuser()+"/qchem.tar.gz -C $TMPDIR/qchemlocal\n")
-                f.write('qchemlocal=$TMPDIR/qchemlocal\n')
-                f.write('export QCHEM_HOME="$qchemlocal"\n')
-                f.write('export QC="$qchemlocal"\n')
-                f.write('export QCAUX="$QC/qcaux"\n')
-                f.write('export QCPROG="$QC/exe/qcprog.exe"\n')
-                f.write('export QCPROG_S="$QC/exe/qcprog.exe_s"\n')
-                f.write('export PATH="$PATH:$QC/exe:$QC/bin"\n')
-                f.write("export QCSCRATCH="+EXDIR1+"/setup/tmp \n")
+            # if(inputs["run"]["method"]=="QChem"):
+            f.write("mkdir $TMPDIR/qchemlocal\n")
+            f.write("tar -xzvf /nobackup/"+getpass.getuser()+"/qchem.tar.gz -C $TMPDIR/qchemlocal\n")
+            f.write('qchemlocal=$TMPDIR/qchemlocal\n')
+            f.write('export QCHEM_HOME="$qchemlocal"\n')
+            f.write('export QC="$qchemlocal"\n')
+            f.write('export QCAUX="$QC/qcaux"\n')
+            f.write('export QCPROG="$QC/exe/qcprog.exe"\n')
+            f.write('export QCPROG_S="$QC/exe/qcprog.exe_s"\n')
+            f.write('export PATH="$PATH:$QC/exe:$QC/bin"\n')
+            f.write("export QCSCRATCH="+EXDIR1+"/setup/tmp \n")
             f.write("cd "+EXDIR1+"/rep-$SGE_TASK_ID \n")
             f.write("./../main")
             f.close()

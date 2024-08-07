@@ -1,7 +1,7 @@
 # PySCF section 
 import time
 from pyscf import gto, scf, dft, grad, lib
-from gpu4pyscf.dft import rks
+# from gpu4pyscf.dft import rks
 
 def create_pyscf_molecule(molecule):
     # Extract molecule information
@@ -49,28 +49,28 @@ def run_pyscf_calculation(mol, scf_algorithm, exchange_functional=None,prev_mf=N
     if prev_mf is not None:
         mf.mo_coeff = prev_mf.mo_coeff
         mf.mo_occ = prev_mf.mo_occ
-    if use_gpu:
-        mf = rks.RKS(mol).to_gpu()
-        mf.xc = '0.5*HF + 0.5*B88,LYP'
-        mf = rks.RKS(mol).run()
-        gobj = mf.nuc_grad_method().to_gpu()
-        forces = gobj.kernel()
-        energy = mf.to_gpu().kernel()  
-    else: 
-        energy = mf.kernel()
-        # Calculate forces (gradients)
-        if mol.spin == 0:
-            if exchange_functional:
-                grad_calc = grad.RKS(mf)
-            else:
-                grad_calc = grad.RHF(mf)
+    # if use_gpu:
+    #     mf = rks.RKS(mol).to_gpu()
+    #     mf.xc = '0.5*HF + 0.5*B88,LYP'
+    #     mf = rks.RKS(mol).run()
+    #     gobj = mf.nuc_grad_method().to_gpu()
+    #     forces = gobj.kernel()
+    #     energy = mf.to_gpu().kernel()  
+    # else: 
+    energy = mf.kernel()
+    # Calculate forces (gradients)
+    if mol.spin == 0:
+        if exchange_functional:
+            grad_calc = grad.RKS(mf)
         else:
-            if exchange_functional:
-                grad_calc = grad.UKS(mf)
-            else:
-                grad_calc = grad.UHF(mf)
+            grad_calc = grad.RHF(mf)
+    else:
+        if exchange_functional:
+            grad_calc = grad.UKS(mf)
+        else:
+            grad_calc = grad.UHF(mf)
         
-        forces = grad_calc.kernel()
+    forces = grad_calc.kernel()
 
     return energy, forces, mf 
 
@@ -80,7 +80,7 @@ def run_pySCF(molecule,Guess=True,exchange_functional='BHHLYP',use_gpu = False):
     guess = False
     time1 = time.time()
     if Guess ==False: 
-        energy, forces,mf = run_pyscf_calculation(mol, 'DIIS', exchange_functional)
+        energy,forces,mf = run_pyscf_calculation(mol, 'DIIS', exchange_functional)
     else:
         energy, forces,mf = run_pyscf_calculation(mol, 'DIIS', exchange_functional,molecule.elecinfo)
     time2=time.time()
