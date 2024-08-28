@@ -60,15 +60,18 @@ if(rep_flg==1):
     command = ['qsub','-N','Check_'+str(randrange(1000)), '-hold_jid', hold_ids, 'recheck.sh'] 
     subprocess.call(command)
     print(command)
-# else:
-#     file2="complete.sh"
-#     f=open(file2,"w")
-#     f.write("#$ -cwd -V \n")
-#     f.write("#$ -l h_vmem=1G,h_rt=00:30:00 \n")
-#     f.write("module add anaconda \n")
-#     f.write("source activate scatter \n")
-#     f.write("python result.py \n")
-#     f.write("python graph.py")
-#     f.close()
-#     command = ['qsub','-N','Complete_'+EXDIR, file2]
-#     subprocess.call(command) 
+else:
+    file2="complete.sh"
+    f=open(file2,"w")
+    f.write("#$ -cwd -V \n")
+    f.write("#$ -l h_vmem=1G,h_rt=00:30:00 \n")
+    f.write("find -name "*.o*" -delete")
+    f.write("find -name "*.e*" -delete")
+    f.write("module add anaconda \n")
+    f.write("source activate scatter \n")
+    f.write("cd code \n")
+    f.write("python result.py \n")
+    f.write("python graphs.py \n")
+    f.close()
+    command = ['qsub','-N','Complete_'+EXDIR, file2]
+    subprocess.call(command) 

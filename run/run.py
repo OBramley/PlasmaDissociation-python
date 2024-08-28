@@ -77,9 +77,10 @@ if __name__=="__main__":
             t_direc=EXDIR1+"/"+str(inputs["Temps"]["t"][i])
             os.mkdir(t_direc)
             os.mkdir(t_direc+"/results")
+            os.mkdir(t_direc+"/results/bonds")
+            os.mkdir(t_direc+"/results/graphs")
+            os.mkdir(t_direc+"/results/specifics")
             shutil.copy2("inputs.json",t_direc)
-            shutil.copy2("graph.py",t_direc)
-            shutil.copy2("result.py",t_direc)
             shutil.copy2("checker.py",t_direc)
             for j in range(inputs["setup"]["repeats"]):
                 os.mkdir(t_direc+"/rep-"+str(j+1))
@@ -89,9 +90,10 @@ if __name__=="__main__":
                 shutil.copytree("../code", t_direc+'/code')
     else:
         os.mkdir(EXDIR1+"/results")
+        os.mkdir(EXDIR1+"/results/bonds")
+        os.mkdir(EXDIR1+"/results/graphs")
+        os.mkdir(EXDIR1+"/results/specifics")
         shutil.copy2("inputs.json",EXDIR1)
-        shutil.copy2("graph.py",EXDIR1)
-        shutil.copy2("result.py",EXDIR1)
         shutil.copy2("checker.py",EXDIR1)
         for i in range(inputs["setup"]["repeats"]):
             os.mkdir(EXDIR1+"/rep-"+str(i+1))
